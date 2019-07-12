@@ -1,91 +1,125 @@
 package org.fogbowcloud.blowout.infrastructure.token;
 
-import java.util.HashMap;
-import java.util.Properties;
-
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
+import org.fogbowcloud.blowout.core.constants.AppPropertiesConstants;
+import org.fogbowcloud.blowout.core.constants.FogbowConstants;
 import org.fogbowcloud.blowout.core.exception.BlowoutException;
-import org.fogbowcloud.blowout.core.util.AppPropertiesConstants;
-import org.fogbowcloud.manager.core.plugins.identity.openstackv2.KeystoneIdentityPlugin;
-import org.fogbowcloud.manager.occi.model.Token;
+
+import static org.fogbowcloud.blowout.core.constants.AppPropertiesConstants.*;
+import static org.fogbowcloud.blowout.core.util.AppUtil.getValueFromJsonStr;
+import static org.fogbowcloud.blowout.core.util.AppUtil.makeBodyField;
+
+import org.fogbowcloud.blowout.core.util.AppUtil;
+import org.fogbowcloud.blowout.infrastructure.http.HttpWrapper;
+import org.fogbowcloud.blowout.infrastructure.model.Token;
+import org.fogbowcloud.blowout.infrastructure.model.User;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+
+
+import java.io.UnsupportedEncodingException;
+import java.util.LinkedList;
+import java.util.Properties;
 
 public class KeystoneTokenUpdatePlugin extends AbstractTokenUpdatePlugin {
 
-	private static final Logger LOGGER = Logger.getLogger(KeystoneTokenUpdatePlugin.class);
+    private static final Logger LOGGER = Logger.getLogger(KeystoneTokenUpdatePlugin.class);
 
-	private static final String FOGBOW_KEYSTONE_USERNAME = AppPropertiesConstants.INFRA_AUTH_TOKEN_PREFIX
-			+ "keystone_username";
-	private static final String FOGBOW_KEYSTONE_TENANTNAME = AppPropertiesConstants.INFRA_AUTH_TOKEN_PREFIX
-			+ "keystone_tenantname";
-	private static final String FOGBOW_KEYSTONE_PASSWORD = AppPropertiesConstants.INFRA_AUTH_TOKEN_PREFIX
-			+ "keystone_password";
-	private static final String FOGBOW_KEYSTONE_AUTH_URL = AppPropertiesConstants.INFRA_AUTH_TOKEN_PREFIX
-			+ "keystone_auth_url";
+    private static final String FOGBOW_USERNAME = AS_TOKEN_PREFIX + AS_TOKEN_USERNAME;
+    private static final String FOGBOW_PASSWORD = AS_TOKEN_PREFIX + AS_TOKEN_PASSWORD;
+    private static final String FOGBOW_PROJECT_NAME = AS_TOKEN_PREFIX + AS_TOKEN_PROJECT_NAME;
+    private static final String FOGBOW_DOMAIN = AS_TOKEN_PREFIX + AS_TOKEN_DOMAIN;
 
-	private final String username;
-	private final String tenantname;
-	private final String password;
-	private final String authUrl;
-	private Properties properties;
+    private final String asBaseUrl;
+    private final String userName;
+    private final String password;
+    private final String projectName;
+    private final String domain;
 
-	public KeystoneTokenUpdatePlugin(Properties properties) {
+    public KeystoneTokenUpdatePlugin(Properties properties) {
+        super(properties);
+        this.userName = super.properties.getProperty(FOGBOW_USERNAME);
+        this.password = super.properties.getProperty(FOGBOW_PASSWORD);
+        this.projectName = super.properties.getProperty(FOGBOW_PROJECT_NAME);
+        this.domain = super.properties.getProperty(FOGBOW_DOMAIN);
+        this.asBaseUrl =  super.properties.getProperty(AS_BASE_URL);
+    }
 
-		super(properties);
+    @Override
+    public Token generateToken() {
+        try {
+            return createToken();
+        } catch (Exception e) {
+            LOGGER.error("Error while setting token.", e);
+            return null;
+        }
+    }
 
-		this.properties = properties;
+    @Override
+    public void validateProperties() throws BlowoutException {
+        validateProperty(super.properties, TOKEN_UPDATE_PLUGIN);
+        validateProperty(super.properties, FOGBOW_USERNAME);
+        validateProperty(super.properties, FOGBOW_PASSWORD);
+        validateProperty(super.properties, FOGBOW_PROJECT_NAME);
+        validateProperty(super.properties, FOGBOW_DOMAIN);
+    }
 
-		this.username = properties.getProperty(FOGBOW_KEYSTONE_USERNAME);
-		this.tenantname = properties.getProperty(FOGBOW_KEYSTONE_TENANTNAME);
-		this.password = properties.getProperty(FOGBOW_KEYSTONE_PASSWORD);
-		this.authUrl = properties.getProperty(FOGBOW_KEYSTONE_AUTH_URL);
-		
-	}
+    private Token createToken() throws Exception {
+        HttpWrapper httpWrapper = new HttpWrapper();
 
-	@Override
-	public Token generateToken() {
+        final String requestUrl = this.asBaseUrl + "/" + FogbowConstants.AS_ENDPOINT_TOKEN;
+        final String publicKeyRAS = getPublicKeyRAS();
+        final StringEntity body = makeBodyJson(publicKeyRAS);
+        body.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, HttpWrapper.HTTP_CONTENT_JSON));
 
-		try {
-			return createToken(this.properties);
-		} catch (Throwable e) {
-			LOGGER.error("Error while setting token.", e);
-		}
-		return null;
-	}
+        final String accessTokenJson = httpWrapper.doRequest(HttpWrapper.HTTP_METHOD_POST, requestUrl, new LinkedList<>(), body);
+        final String accessToken = getValueFromJsonStr("token", accessTokenJson);
+        final String userId = AppUtil.generateIdentifier();
+        User user = new User(userId, this.userName, this.password);
 
-	protected Token createToken() {
-		return createToken(new Properties());
-	}
+        return new Token(accessToken, user);
+    }
 
-	protected Token createToken(Properties properties) {
-		KeystoneIdentityPlugin keystoneIdentityPlugin = new KeystoneIdentityPlugin(properties);
 
-		HashMap<String, String> credentials = new HashMap<String, String>();
+    private String getPublicKeyRAS() throws Exception{
+        final String requestUrl = this.properties.getProperty(AppPropertiesConstants.RAS_BASE_URL) + "/" + FogbowConstants.RAS_ENDPOINT_PUBLIC_KEY;
+        HttpUriRequest request = new HttpGet(requestUrl);
+        HttpResponse response = HttpClients.createMinimal().execute(request);
+        HttpEntity entity = response.getEntity();
+        String responseString = EntityUtils.toString(entity, "UTF-8");
+        return getValueFromJsonStr(FogbowConstants.JSON_KEY_RAS_PUBLIC_KEY, responseString);
+    }
 
-		credentials.put(KeystoneIdentityPlugin.AUTH_URL, authUrl);
-		credentials.put(KeystoneIdentityPlugin.USERNAME, username);
-		credentials.put(KeystoneIdentityPlugin.PASSWORD, password);
-		credentials.put(KeystoneIdentityPlugin.TENANT_NAME, tenantname);
-		LOGGER.debug("Creating token update with USERNAME=" + username + " and PASSWORD=" + password);
 
-		Token token = keystoneIdentityPlugin.createToken(credentials);
-		LOGGER.debug("Keystone cert updated. New cert is " + token.toString());
+    private StringEntity makeBodyJson(String publicKey) throws JSONException, UnsupportedEncodingException {
+        JSONObject json = new JSONObject();
 
-		return token;
-	}
+        JSONObject credentials = new JSONObject();
+        makeBodyField(credentials, AS_TOKEN_USERNAME, this.userName);
+        makeBodyField(credentials, AS_TOKEN_PASSWORD, this.password);
+        makeBodyField(credentials, AS_TOKEN_DOMAIN, this.domain);
+        makeBodyField(credentials, AS_TOKEN_PROJECT_NAME, this.projectName);
 
-	@Override
-	public void validateProperties() throws BlowoutException {
-		if (!properties.containsKey(FOGBOW_KEYSTONE_USERNAME)) {
-			throw new BlowoutException("Required property " + FOGBOW_KEYSTONE_USERNAME + " was not set");
-		}
-		if (!properties.containsKey(FOGBOW_KEYSTONE_TENANTNAME)) {
-			throw new BlowoutException("Required property " + FOGBOW_KEYSTONE_TENANTNAME + " was not set");
-		}
-		if (!properties.containsKey(FOGBOW_KEYSTONE_PASSWORD)) {
-			throw new BlowoutException("Required property " + FOGBOW_KEYSTONE_PASSWORD + " was not set");
-		}
-		if (!properties.containsKey(FOGBOW_KEYSTONE_AUTH_URL)) {
-			throw new BlowoutException("Required property " + FOGBOW_KEYSTONE_AUTH_URL + " was not set");
-		}
-	}
+        json.put(AS_TOKEN_CREDENTIALS, credentials);
+        makeBodyField(json, AS_TOKEN_PUBLIC_KEY, publicKey);
+
+        return new StringEntity(json.toString());
+    }
+
+    private void validateProperty(Properties property, String propertyKey) throws BlowoutException {
+        if (property == null || !property.containsKey(propertyKey)) {
+            throw new BlowoutException("Required property " + propertyKey + " was not set");
+        }
+    }
 }
+

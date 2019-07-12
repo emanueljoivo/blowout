@@ -1,167 +1,110 @@
 package org.fogbowcloud.blowout.core.model;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
+import org.fogbowcloud.blowout.core.constants.FogbowConstants;
+import org.fogbowcloud.blowout.core.util.AppUtil;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.google.gson.Gson;
-
 public class Specification implements Serializable {
+
+	private static final long serialVersionUID = 5255295548723927267L;
+
+	// Todo remove these constants to a separated file.
+	private static final String LN = System.lineSeparator();
 	private static final String REQUIREMENTS_MAP_STR = "requirementsMap";
-
 	private static final String USER_DATA_TYPE_STR = "userDataType";
-
 	private static final String USER_DATA_FILE_STR = "userDataFile";
-
 	private static final String CONTEXT_SCRIPT_STR = "contextScript";
-
 	private static final String PRIVATE_KEY_FILE_PATH_STR = "privateKeyFilePath";
-
 	private static final String PUBLIC_KEY_STR = "publicKey";
-
 	private static final String USERNAME_STR = "username";
-
 	private static final String IMAGE_STR = "image";
-
+	private static final String CLOUD_NAME_STR = "cloudName";
 	private static final Logger LOGGER = Logger.getLogger(Specification.class);
 
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = 5255295548723927267L;
-	String image;
-	String username;
-	String privateKeyFilePath;
-	String publicKey;
-	String contextScript;
-	String userDataFile;
-	String userDataType;
+	private String cloudName;
+	private String imageName;
+	private String username;
+	private String privateKeyFilePath;
+	private String publicKey;
 
-	Map<String, String> requirements = new HashMap<String, String>();
+	//TODO Analyze the removal of these attributes
+	private String contextScript;
+	private String userDataFile;
+	private String userDataType;
 
-	public Specification(String image, String username, String publicKey, String privateKeyFilePath) {
-		this(image, username, publicKey, privateKeyFilePath, "", "");
-	}
+	private Map<String, String> requirements;
 
-	public Specification(String image, String username, String publicKey, String privateKeyFilePath,
-			String userDataFile, String userDataType) {
-		this.image = image;
+	public Specification(String imageName, String username, String publicKey, String privateKeyFilePath) {
+		this.cloudName = null;
+		this.imageName = imageName;
 		this.username = username;
 		this.publicKey = publicKey;
 		this.privateKeyFilePath = privateKeyFilePath;
+		this.requirements = new HashMap<>();
+	}
+
+	public Specification(String cloudName, String imageName, String username, String publicKey, String privateKeyFilePath) {
+		this.cloudName = cloudName;
+		this.imageName = imageName;
+		this.username = username;
+		this.publicKey = publicKey;
+		this.privateKeyFilePath = privateKeyFilePath;
+		this.requirements = new HashMap<>();
+	}
+
+	public Specification(String cloudName, String imageName, String username, String publicKey, String privateKeyFilePath,
+						 String userDataFile, String userDataType) {
+		this(cloudName, imageName, username, publicKey, privateKeyFilePath);
 		this.userDataFile = userDataFile;
 		this.userDataType = userDataType;
 	}
 
+	public Specification(String cloudName, String imageName, String username, String publicKey, String privateKeyFilePath,
+						 String userDataFile, String userDataType, String vCPU, String memory, String disk) {
+		this(cloudName, imageName, username, publicKey, privateKeyFilePath, userDataFile, userDataType);
+	}
+
 	public void addRequirement(String key, String value) {
-		requirements.put(key, value);
+		this.requirements.put(key, value);
 	}
 
 	public String getRequirementValue(String key) {
-		return requirements.get(key);
+		return this.requirements.get(key);
 	}
 
 	public void putAllRequirements(Map<String, String> requirements) {
 		for (Entry<String, String> e : requirements.entrySet()) {
-			
 			this.requirements.put(e.getKey(), e.getValue());
 		}
 	}
 
 	public Map<String, String> getAllRequirements() {
-		return requirements;
+		return this.requirements;
 	}
 
-	public void removeAllRequirements() {
-		requirements = new HashMap<String, String>();
-	}
+	public String getCloudName() {return this.cloudName; }
 
-	public static List<Specification> getSpecificationsFromJSonFile(String jsonFilePath) throws IOException {
-
-		List<Specification> specifications = new ArrayList<Specification>();
-		if (jsonFilePath != null && !jsonFilePath.isEmpty()) {
-
-			BufferedReader br = new BufferedReader(new FileReader(jsonFilePath));
-
-			Gson gson = new Gson();
-			specifications = Arrays.asList(gson.fromJson(br, Specification[].class));
-			br.close();
-
-			for (Specification spec : specifications) {
-
-				File file = new File(spec.getPublicKey());
-				if (file.exists()) {
-					StringBuilder sb = new StringBuilder();
-					BufferedReader brSpec = new BufferedReader(new FileReader(file));
-					String line = "";
-					while ((line = brSpec.readLine()) != null && !line.isEmpty()) {
-						sb.append(line);
-					}
-					spec.setPublicKey(sb.toString());
-					
-					brSpec.close();
-				}
-			}
-
-		}
-		return specifications;
-	}
-
-	public boolean parseToJsonFile(String jsonDestFilePath) {
-
-		List<Specification> spec = new ArrayList<Specification>();
-		spec.add(this);
-		return Specification.parseSpecsToJsonFile(spec, jsonDestFilePath);
-	}
-
-	public static boolean parseSpecsToJsonFile(List<Specification> specs, String jsonDestFilePath) {
-
-		if (jsonDestFilePath != null && !jsonDestFilePath.isEmpty()) {
-
-			BufferedWriter bw;
-			try {
-				bw = new BufferedWriter(new FileWriter(jsonDestFilePath));
-				Gson gson = new Gson();
-				String spectString = gson.toJson(specs);
-				bw.write(spectString);
-				bw.close();
-				return true;
-			} catch (IOException e) {
-				return false;
-			}
-		} else {
-			return false;
-		}
-	}
-
-	public String getImage() {
-		return image;
+	public String getImageName() {
+		return this.imageName;
 	}
 
 	public String getUsername() {
-		return username;
+		return this.username;
 	}
 
 	public String getPrivateKeyFilePath() {
-		return privateKeyFilePath;
+		return this.privateKeyFilePath;
 	}
 
 	public String getPublicKey() {
-		return publicKey;
+		return this.publicKey;
 	}
 
 	public void setPublicKey(String publicKey) {
@@ -169,7 +112,7 @@ public class Specification implements Serializable {
 	}
 
 	public String getContextScript() {
-		return contextScript;
+		return this.contextScript;
 	}
 
 	public void setContextScript(String contextScript) {
@@ -177,7 +120,7 @@ public class Specification implements Serializable {
 	}
 
 	public String getUserDataFile() {
-		return userDataFile;
+		return this.userDataFile;
 	}
 
 	public void setUserDataFile(String userDataFile) {
@@ -185,7 +128,7 @@ public class Specification implements Serializable {
 	}
 
 	public String getUserDataType() {
-		return userDataType;
+		return this.userDataType;
 	}
 
 	public void setUserDataType(String userDataType) {
@@ -195,33 +138,127 @@ public class Specification implements Serializable {
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Image: " + image);
-		sb.append(" PublicKey: " + publicKey);
-		if (contextScript != null && !contextScript.isEmpty()) {
-			sb.append("\nContextScript: " + contextScript);
+		if((this.cloudName != null) && !this.cloudName.isEmpty()){
+			sb.append("CloudName: " + this.cloudName);
 		}
-		if (userDataFile != null && !userDataFile.isEmpty()) {
-			sb.append("\nUserDataFile:" + userDataFile);
+		sb.append(" Image: " + this.imageName);
+		sb.append(" PublicKey: " + this.publicKey);
+		if ((this.contextScript != null) && !this.contextScript.isEmpty()) {
+			sb.append(LN + "ContextScript: " + contextScript);
 		}
-		if (userDataType != null && !userDataType.isEmpty()) {
-			sb.append("\nUserDataType:" + userDataType);
+		if ((this.userDataFile != null) && !this.userDataFile.isEmpty()) {
+			sb.append(LN + "UserDataFile:" + this.userDataFile);
 		}
-		if (requirements != null && !requirements.isEmpty()) {
-			sb.append("\nRequirements:{");
-			for (Entry<String, String> entry : requirements.entrySet()) {
-				sb.append("\n\t" + entry.getKey() + ": " + entry.getValue());
+		if ((this.userDataType != null) && !this.userDataType.isEmpty()) {
+			sb.append(LN + "UserDataType:" + this.userDataType);
+		}
+		if ((this.requirements != null) && !this.requirements.isEmpty()) {
+			sb.append(LN + "Requirements:{");
+			for (Entry<String, String> entry : this.requirements.entrySet()) {
+				sb.append(LN + "\t" + entry.getKey() + ": " + entry.getValue());
 			}
-			sb.append("\n}");
+			sb.append(LN + "}");
 		}
 		return sb.toString();
+	}
+
+	public Specification clone() {
+		Specification cloneSpec = new Specification(this.cloudName, this.imageName, this.username, this.publicKey, this.privateKeyFilePath,
+				this.userDataFile, this.userDataType);
+		cloneSpec.putAllRequirements(this.getAllRequirements());
+		return cloneSpec;
+	}
+
+	public JSONObject toJSON() {
+		try {
+			JSONObject specification = new JSONObject();
+			specification.put(CLOUD_NAME_STR, this.getCloudName());
+			specification.put(IMAGE_STR, this.getImageName());
+			specification.put(USERNAME_STR, this.getUsername());
+			specification.put(PUBLIC_KEY_STR, this.getPublicKey());
+			specification.put(PRIVATE_KEY_FILE_PATH_STR, this.getPrivateKeyFilePath());
+			specification.put(CONTEXT_SCRIPT_STR, this.getContextScript());
+			specification.put(USER_DATA_FILE_STR, this.getUserDataFile());
+			specification.put(USER_DATA_TYPE_STR, this.getUserDataType());
+			specification.put(REQUIREMENTS_MAP_STR, getAllRequirements().toString());
+			return specification;
+		} catch (JSONException e) {
+			LOGGER.debug("Error while trying to create a JSON from Specification", e);
+			return null;
+		}
+	}
+
+	public static Specification fromJSON(JSONObject specJSON) {
+		Specification specification = new Specification(specJSON.optString(CLOUD_NAME_STR), specJSON.optString(IMAGE_STR), specJSON.optString(USERNAME_STR),
+				specJSON.optString(PUBLIC_KEY_STR), specJSON.optString(PRIVATE_KEY_FILE_PATH_STR),
+				specJSON.optString(USER_DATA_FILE_STR), specJSON.optString(USER_DATA_TYPE_STR));
+		HashMap<String, String> reqMap = (HashMap<String, String>) toMap(specJSON.optString(REQUIREMENTS_MAP_STR));
+		specification.putAllRequirements(reqMap);
+		return specification;
+	}
+
+	public static Map<String, String> toMap(String jsonStr) {
+		return AppUtil.toMap(jsonStr);
+	}
+
+	public String getvCPU() {
+		return getFogbowRequirement(FogbowConstants.METADATA_FOGBOW_REQUIREMENTS_Glue2vCPU);
+	}
+
+	public String getMemory() {
+		return getFogbowRequirement(FogbowConstants.METADATA_FOGBOW_REQUIREMENTS_Glue2RAM);
+	}
+
+	public String getDisk() {
+		return getFogbowRequirement(FogbowConstants.METADATA_FOGBOW_REQUIREMENTS_Glue2disk);
+	}
+
+	private String getFogbowRequirement(String fogbowRequirementKey) {
+		String fogbowRequirements = getRequirementValue(FogbowConstants.METADATA_FOGBOW_REQUIREMENTS);
+
+		if (fogbowRequirements == null) {
+			return null;
+		}
+
+		fogbowRequirements = fogbowRequirements.trim().replaceAll(" +", " ");
+
+		boolean found = fogbowRequirements.contains(fogbowRequirementKey);
+
+		String fogbowRequirementValue = "";
+		if (found) {
+			String[] strAsArray = fogbowRequirements.split(" ");
+			String currentItemKey, currentItemOperator, currentItemValue;
+
+			for (int i = 0; i < strAsArray.length; i++) {
+
+				currentItemKey = strAsArray[i];
+				currentItemOperator = strAsArray[i+1];
+				currentItemValue = strAsArray[i+2];
+
+				if (currentItemKey.equals(fogbowRequirementKey)) {
+					switch (currentItemOperator) {
+						case "<=":
+						case "==":
+						case ">=":
+							fogbowRequirementValue = currentItemValue;
+							break;
+						default:
+							break;
+					}
+					break;
+				}
+			}
+		}
+		return fogbowRequirementValue;
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
+		result = prime * result + ((cloudName == null) ? 0 : cloudName.hashCode());
 		result = prime * result + ((contextScript == null) ? 0 : contextScript.hashCode());
-		result = prime * result + ((image == null) ? 0 : image.hashCode());
+		result = prime * result + ((imageName == null) ? 0 : imageName.hashCode());
 		result = prime * result + ((privateKeyFilePath == null) ? 0 : privateKeyFilePath.hashCode());
 		result = prime * result + ((publicKey == null) ? 0 : publicKey.hashCode());
 		result = prime * result + ((userDataFile == null) ? 0 : userDataFile.hashCode());
@@ -240,15 +277,20 @@ public class Specification implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		Specification other = (Specification) obj;
+		if (cloudName == null) {
+			if (other.cloudName != null)
+				return false;
+		} else if (!cloudName.equals(other.cloudName))
+			return false;
 		if (contextScript == null) {
 			if (other.contextScript != null)
 				return false;
 		} else if (!contextScript.equals(other.contextScript))
 			return false;
-		if (image == null) {
-			if (other.image != null)
+		if (imageName == null) {
+			if (other.imageName != null)
 				return false;
-		} else if (!image.equals(other.image))
+		} else if (!imageName.equals(other.imageName))
 			return false;
 		if (privateKeyFilePath == null) {
 			if (other.privateKeyFilePath != null)
@@ -276,62 +318,7 @@ public class Specification implements Serializable {
 		} else if (!requirements.equals(other.requirements))
 			return false;
 		if (username == null) {
-			if (other.username != null)
-				return false;
-		} else if (!username.equals(other.username))
-			return false;
-		return true;
-	}
-
-	public Specification clone() {
-		Specification cloneSpec = new Specification(this.image, this.username, this.publicKey, this.privateKeyFilePath,
-				this.userDataFile, this.userDataType);
-		cloneSpec.putAllRequirements(this.getAllRequirements());
-		return cloneSpec;
-	}
-
-	public JSONObject toJSON() {
-		try {
-			JSONObject specification = new JSONObject();
-			specification.put(IMAGE_STR, this.getImage());
-			specification.put(USERNAME_STR, this.getUsername());
-			specification.put(PUBLIC_KEY_STR, this.getPublicKey());
-			specification.put(PRIVATE_KEY_FILE_PATH_STR, this.getPrivateKeyFilePath());
-			specification.put(CONTEXT_SCRIPT_STR, this.getContextScript());
-			specification.put(USER_DATA_FILE_STR, this.getUserDataFile());
-			specification.put(USER_DATA_TYPE_STR, this.getUserDataType());
-			specification.put(REQUIREMENTS_MAP_STR, getAllRequirements().toString());
-			return specification;
-		} catch (JSONException e) {
-			LOGGER.debug("Error while trying to create a JSON from Specification", e);
-			return null;
-		}
-	}
-
-	public static Specification fromJSON(JSONObject specJSON) {
-		Specification specification = new Specification(specJSON.optString(IMAGE_STR), specJSON.optString(USERNAME_STR),
-				specJSON.optString(PUBLIC_KEY_STR), specJSON.optString(PRIVATE_KEY_FILE_PATH_STR),
-				specJSON.optString(USER_DATA_FILE_STR), specJSON.optString(USER_DATA_TYPE_STR));
-		HashMap<String, String> reqMap = (HashMap<String, String>) toMap(specJSON.optString(REQUIREMENTS_MAP_STR));
-		specification.putAllRequirements(reqMap);
-		return specification;
-	}
-
-
-	public static Map<String, String> toMap(String jsonStr) {
-		Map<String, String> newMap = new HashMap<String, String>();
-		jsonStr = jsonStr.replace("{", "").replace("}", "");
-		String[] blocks = jsonStr.split(",");
-		for (int i = 0; i < blocks.length; i++) {
-			String block = blocks[i];
-			int indexOfCarac = block.indexOf("=");
-			if (indexOfCarac < 0) {
-				continue;
-			}
-			String key = block.substring(0, indexOfCarac).trim();
-			String value = block.substring(indexOfCarac + 1, block.length()).trim();
-			newMap.put(key, value);
-		}
-		return newMap;
-	}
+            return other.username == null;
+		} else return username.equals(other.username);
+    }
 }

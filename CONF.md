@@ -7,8 +7,8 @@ The following properties show all possible Blowout configurations with a brief d
 ### Implementation Plugins
 	impl_blowout_pool_class_name=org.fogbowcloud.blowout.pool.DefaultBlowoutPool
 	impl_scheduler_class_name=org.fogbowcloud.blowout.infrastructure.manager.DefaultInfrastructureManager
-	impl_infra_manager_class_name=org.fogbowcloud.blowout.core.StandardScheduler
-	infra_provider_class_name=org.fogbowcloud.blowout.scheduler.infrastructure.fogbow.FogbowInfrastructureProvider
+	impl_infra_manager_class_name=org.fogbowcloud.blowout.scheduler.DefaultScheduler
+	infra_provider_class_name=org.fogbowcloud.blowout.infrastructure.provider.fogbow.FogbowInfrastructureProvider
 
 Configuration Field | Description | Required (Default values in the example)
 -------------------------- | -------------------- | --------
@@ -90,7 +90,7 @@ LDAP Public Key | File path of the Public Key | **Yes**
 
 
 #### Authentication Token Properties - Case Keystone
-	infra_auth_token_update_plugin=org.fogbowcloud.blowout.infrastructure.token.KeystoneTokenUpdatePlugin
+	infra_auth_token_update_plugin=org.fogbowcloud.blowout.infrastructure.token.ASTokenUpdatePlugin
 	auth_token_prop_keystone_username=
 	auth_token_prop_keystone_tenantname=
 	auth_token_prop_keystone_password=

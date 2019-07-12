@@ -4,26 +4,30 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.log4j.Logger;
-import org.fogbowcloud.blowout.core.SchedulerInterface;
-import org.fogbowcloud.blowout.core.model.Task;
+import org.fogbowcloud.blowout.scheduler.Scheduler;
+import org.fogbowcloud.blowout.core.model.task.Task;
 import org.fogbowcloud.blowout.infrastructure.manager.InfrastructureManager;
-import org.fogbowcloud.blowout.infrastructure.model.ResourceState;
+import org.fogbowcloud.blowout.core.model.resource.AbstractResource;
+import org.fogbowcloud.blowout.core.model.resource.ResourceState;
 
 public class DefaultBlowoutPool implements BlowoutPool {
 	
-	public static final Logger LOGGER = Logger.getLogger(DefaultBlowoutPool.class);
+	private static final Logger LOGGER = Logger.getLogger(DefaultBlowoutPool.class);
 
-	private Map<String, AbstractResource> resourcePool = new ConcurrentHashMap<String, AbstractResource>();
-	private List<Task> taskPool = new ArrayList<Task>();
+	private Map<String, AbstractResource> resourcePool;
+	private List<Task> taskPool;
 	private InfrastructureManager infraManager;
-	private SchedulerInterface schedulerInterface;
+	private Scheduler scheduler;
 
 	@Override
-	public void start(InfrastructureManager infraManager, SchedulerInterface schedulerInterface) {
+	public void start(InfrastructureManager infraManager, Scheduler scheduler) {
+		this.resourcePool = new ConcurrentHashMap<>();
+		this.taskPool = new CopyOnWriteArrayList<>();
 		this.infraManager = infraManager;
-		this.schedulerInterface = schedulerInterface;
+		this.scheduler = scheduler;
 	}
 
 	@Override
@@ -54,8 +58,10 @@ public class DefaultBlowoutPool implements BlowoutPool {
 
 	protected synchronized void callAct() {
 		try {
+			LOGGER.debug("Calling act from the Thread " + Thread.currentThread().getId() +
+					" of entity: " + Thread.currentThread().getName());
 			infraManager.act(getAllResources(), getAllTasks());
-			schedulerInterface.act(getAllTasks(), getAllResources());
+			scheduler.act(getAllTasks(), getAllResources());
 		} catch (Exception e) {
 			LOGGER.error("Error while calling act", e);
 		}
@@ -63,7 +69,7 @@ public class DefaultBlowoutPool implements BlowoutPool {
 
 	@Override
 	public List<AbstractResource> getAllResources() {
-		return new ArrayList<AbstractResource>(resourcePool.values());
+		return new ArrayList<>(resourcePool.values());
 	}
 
 	@Override
@@ -77,7 +83,7 @@ public class DefaultBlowoutPool implements BlowoutPool {
 	}
 
 	@Override
-	public void putTask(Task task) {
+	public void addTask(Task task) {
 
 		taskPool.add(task);
 		callAct();
@@ -85,14 +91,15 @@ public class DefaultBlowoutPool implements BlowoutPool {
 
 	@Override
 	public void addTasks(List<Task> tasks) {
-
 		taskPool.addAll(tasks);
+		LOGGER.info("The tasks that references the job " + Thread.currentThread().getName() +
+				" was added to the Pool.");
 		callAct();
 	}
 
 	@Override
 	public List<Task> getAllTasks() {
-		return new ArrayList<Task>(taskPool);
+		return new ArrayList<>(taskPool);
 	}
 
 	@Override
@@ -102,13 +109,26 @@ public class DefaultBlowoutPool implements BlowoutPool {
 				return taskPool.get(i);
 			}
 		}
-		
 		return null;
 	}
 
 	@Override
 	public void removeTask(Task task) {
 		taskPool.remove(task);
+		callAct();
+	}
+
+	@Override
+	public void removeTasks(List<Task> tasks){
+		LOGGER.info("Removing list of tasks");
+		for(Task taskToRemove : tasks){
+			for(Task task : taskPool){
+				if(task.getId().equals(taskToRemove.getId())){
+					taskPool.remove(task);
+				}
+			}
+		}
+		scheduler.stopTasks(tasks);
 		callAct();
 	}
 
@@ -120,12 +140,12 @@ public class DefaultBlowoutPool implements BlowoutPool {
 		this.infraManager = infraManager;
 	}
 
-	protected SchedulerInterface getSchedulerInterface() {
-		return schedulerInterface;
+	protected Scheduler getScheduler() {
+		return scheduler;
 	}
 
-	protected void setSchedulerInterface(SchedulerInterface schedulerInterface) {
-		this.schedulerInterface = schedulerInterface;
+	protected void setScheduler(Scheduler scheduler) {
+		this.scheduler = scheduler;
 	}
 
 	protected Map<String, AbstractResource> getResourcePool() {
